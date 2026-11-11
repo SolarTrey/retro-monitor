@@ -6,6 +6,8 @@ A small desktop widget for Windows that looks like a vintage CRT monitor. Drag a
 
 The monitor has no window frame or background. It sits on your desktop as a small, see-through widget, so your icons and wallpaper stay visible around it.
 
+> The pictures in this README are mock-ups made while designing the program. Replace them with screenshots of your own build (`images/boot.png`, `images/switch.png`) if you want them to match exactly.
+
 ## Features
 
 - Realistic retro monitor with a transparent background
@@ -14,20 +16,33 @@ The monitor has no window frame or background. It sits on your desktop as a smal
 - Drag and drop any video file to read its FPS and resolution
 - Can be dragged anywhere on the desktop and kept on top of other windows
 
-## Building the program
+## Installing
+
+### Option 1: Installer (easiest)
+
+1. Go to the **[Releases](../../releases/latest)** page of this repository.
+2. Under **Assets**, download `RetroResolutionFPS-Setup.exe`.
+3. Double-click it, choose whether you want a desktop shortcut, and click **Install**.
+
+The installer puts the program in your user folder, so it **doesn't need administrator rights**. It adds a Start menu shortcut called "Retro Resolution & FPS", and optionally a desktop shortcut.
+
+Windows SmartScreen may say the publisher is unknown, because the installer isn't code-signed. Click **More info**, then **Run anyway**.
+
+**Uninstalling:** open **Settings → Apps → Installed apps**, find **Retro Resolution & FPS**, and choose **Uninstall**. This removes the program and its shortcuts.
+
+### Option 2: Build it yourself
 
 You need Windows. Nothing else has to be installed, because the build uses the C# compiler that comes with Windows.
 
-1. Put these files together in one folder:
-   - `RetroMonitor.cs`
-   - `skin.png`
-   - `build.bat`
-2. Double-click `build.bat`.
-3. When it finishes, `RetroMonitor.exe` appears in the same folder.
+1. Download or clone this repository and extract it, so that all the files are in one folder.
+2. Double-click one of these:
+   - `build_installer.bat` builds `RetroResolutionFPS-Setup.exe`, the same installer as in Option 1.
+   - `build.bat` builds just `RetroMonitor.exe`, which runs by itself with no install. It needs `RetroMonitor.cs`, `skin.png` and `build.bat` in the same folder.
+3. When it finishes, the exe appears in the same folder.
 
-The skin image is packed inside the exe, so after building you only need `RetroMonitor.exe` to run it.
+The skin image is packed inside the exe, so `RetroMonitor.exe` needs no other files to run.
 
-If Windows SmartScreen warns about `build.bat` or the exe, click **More info**, then **Run anyway**. This warning appears because the files came from the internet.
+If Windows SmartScreen warns about a `.bat` file or an exe you built, click **More info**, then **Run anyway**.
 
 ## How to use it
 
@@ -103,7 +118,7 @@ If neither Windows nor ffprobe can read the file, the screen shows **ERR: no vid
 The format may not be supported by Windows. Add `ffprobe.exe` next to the program, as described above.
 
 **The build fails.**
-Make sure `RetroMonitor.cs`, `skin.png` and `build.bat` are all in the same folder, and that you extracted the zip first instead of running `build.bat` from inside it. If it still fails, open an issue and include the error message from the black window.
+Make sure all the repository files are in the same folder (for the installer: `RetroMonitor.cs`, `Installer.cs`, `skin.png` and `build_installer.bat`), and that you extracted the zip first instead of running `build.bat` from inside it. If it still fails, open an issue and include the error message from the black window.
 
 **I can't see the monitor.**
 It starts near the top right of your main screen. If you have several screens, check the others.
@@ -115,6 +130,8 @@ It starts near the top right of your main screen. If you have several screens, c
 | `RetroMonitor.cs` | The program source code |
 | `skin.png` | The monitor artwork |
 | `build.bat` | Builds `RetroMonitor.exe` |
+| `Installer.cs` | Source code of the installer |
+| `build_installer.bat` | Builds `RetroResolutionFPS-Setup.exe` (the installer) |
 | `LICENSE` | Licence terms |
 | `images/` | Pictures used in this README |
 
