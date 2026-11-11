@@ -10,7 +10,10 @@ if not exist skin.png (
   exit /b 1
 )
 
-"%CSC%" /nologo /target:winexe /optimize /out:RetroMonitor.exe ^
+set ICON=
+if exist icon.ico set ICON=/win32icon:icon.ico
+
+"%CSC%" /nologo /target:winexe /optimize %ICON% /out:RetroMonitor.exe ^
   /resource:skin.png,skin.png ^
   /reference:System.Windows.Forms.dll /reference:System.Drawing.dll ^
   RetroMonitor.cs

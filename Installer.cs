@@ -178,6 +178,7 @@ class InstallForm : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
+        try { Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(420, 250);
         BackColor = Color.FromArgb(16, 20, 18);

@@ -1,18 +1,21 @@
-# Retro Resolution & FPS
+<p align="center"><img src="images/icon.png" width="96" alt="Retro Resolution & FPS icon"></p>
+
+<h1 align="center">Retro Resolution & FPS</h1>
 
 A small desktop widget for Windows that looks like a vintage CRT monitor. Drag a video file onto its screen and it tells you the video's **frame rate (FPS)** and **resolution**, in glowing green text.
 
 ![Boot screen of Retro Resolution & FPS](images/boot.png)
 
-The monitor has no window frame or background. It sits on your desktop as a small, see-through widget, so your icons and wallpaper stay visible around it.
+The computer has no window frame or background. It sits on your desktop as a small, see-through widget, so your icons and wallpaper stay visible around it.
 
-> The pictures in this README are mock-ups made while designing the program. Replace them with screenshots of your own build (`images/boot.png`, `images/switch.png`) if you want them to match exactly.
+> The pictures in this README are mock-ups made while designing the program, so the real thing may differ slightly.
 
 ## Features
 
-- Realistic retro monitor with a transparent background
-- Amber rocker power switch that tilts between ON and OFF
+- Retro beige computer with a CRT screen and a transparent background
+- Translucent red rocker power switch that tilts between ON and OFF
 - CRT turn-on effect, boot screen with a progress bar, and a CRT shutdown effect
+- CRT sound effects: switch click, degauss thunk, rising whine and static on power-on, and a collapsing whine and pop on power-off
 - Drag and drop any video file to read its FPS and resolution
 - Can be dragged anywhere on the desktop and kept on top of other windows
 
@@ -23,6 +26,9 @@ The monitor has no window frame or background. It sits on your desktop as a smal
 1. Go to the **[Releases](../../releases/latest)** page of this repository.
 2. Under **Assets**, download `RetroResolutionFPS-Setup.exe`.
 3. Double-click it, choose whether you want a desktop shortcut, and click **Install**.
+4. Open **Retro Resolution & FPS** from the Start menu (or the desktop shortcut). If you left "Start the monitor when setup finishes" ticked, it opens by itself.
+
+If the Releases page has no download yet, use Option 2 below to build the installer yourself.
 
 The installer puts the program in your user folder, so it **doesn't need administrator rights**. It adds a Start menu shortcut called "Retro Resolution & FPS", and optionally a desktop shortcut.
 
@@ -37,7 +43,7 @@ You need Windows. Nothing else has to be installed, because the build uses the C
 1. Download or clone this repository and extract it, so that all the files are in one folder.
 2. Double-click one of these:
    - `build_installer.bat` builds `RetroResolutionFPS-Setup.exe`, the same installer as in Option 1.
-   - `build.bat` builds just `RetroMonitor.exe`, which runs by itself with no install. It needs `RetroMonitor.cs`, `skin.png` and `build.bat` in the same folder.
+   - `build.bat` builds just `RetroMonitor.exe`, which runs by itself with no install. It needs `RetroMonitor.cs`, `skin.png`, `icon.ico` and `build.bat` in the same folder.
 3. When it finishes, the exe appears in the same folder.
 
 The skin image is packed inside the exe, so `RetroMonitor.exe` needs no other files to run.
@@ -48,11 +54,11 @@ If Windows SmartScreen warns about a `.bat` file or an exe you built, click **Mo
 
 ### 1. Power it on
 
-When you open the program, the monitor is switched **off** and the screen is black.
+When you open the program, the monitor is switched **off** and the screen shows its dull grey glass.
 
-Click the amber rocker switch in the right-hand panel, labelled **POWER**. The switch tilts across and the monitor starts up:
+Click the red rocker switch on the left of the computer's lower bezel, labelled **POWER**. The switch tilts across and the monitor starts up:
 
-![The amber rocker switch: off, and the two on positions](images/switch.png)
+![The red rocker switch: off, and the two on positions](images/switch.png)
 
 1. The screen flashes on and a burst of static fades out.
 2. The title **RETRO RESOLUTION & FPS** types out.
@@ -77,13 +83,22 @@ If you drop something that isn't a video, the screen shows **ERR: no video**.
 
 ### 3. Power it off
 
-Click the amber switch again. The picture shrinks to a line, then a dot, and fades out like an old monitor.
+Click the red switch again. The picture shrinks to a line, then a dot, and fades out like an old monitor.
 
 **Switching the monitor off does not close the program.** The monitor stays on your desktop, switched off, until you close it as described below. You can switch it on again at any time.
 
 ### 4. Move it around
 
 Click and hold anywhere on the monitor's body (not on the switch) and drag it to where you want it. It starts near the top right of your screen.
+
+### 5. Turn the sound effects off (or back on)
+
+The monitor plays CRT sounds when you switch it on and off. To mute them:
+
+1. Right-click the monitor.
+2. Click **Sound effects** so the tick next to it disappears.
+
+Click it again to bring the sounds back. The setting lasts until you close the program, and the sounds are on again the next time you open it.
 
 ## Right-click menu
 
@@ -92,6 +107,7 @@ Right-click anywhere on the monitor to open this menu:
 | Menu item | What it does |
 |---|---|
 | **Always on top** | Keeps the monitor in front of other windows. Tick it again to turn it off. |
+| **Sound effects** | Ticked by default. Click it to untick and mute the power-on and power-off sounds. |
 | **Clear screen** | Clears the result and returns to **add source_**. |
 | **Power off (exit)** | **Closes the program completely.** |
 
@@ -118,7 +134,7 @@ If neither Windows nor ffprobe can read the file, the screen shows **ERR: no vid
 The format may not be supported by Windows. Add `ffprobe.exe` next to the program, as described above.
 
 **The build fails.**
-Make sure all the repository files are in the same folder (for the installer: `RetroMonitor.cs`, `Installer.cs`, `skin.png` and `build_installer.bat`), and that you extracted the zip first instead of running `build.bat` from inside it. If it still fails, open an issue and include the error message from the black window.
+Make sure all the repository files are in the same folder (for the installer: `RetroMonitor.cs`, `Installer.cs`, `skin.png`, `icon.ico` and `build_installer.bat`), and that you extracted the zip first instead of running `build.bat` from inside it. If it still fails, open an issue and include the error message from the black window.
 
 **I can't see the monitor.**
 It starts near the top right of your main screen. If you have several screens, check the others.
@@ -129,6 +145,7 @@ It starts near the top right of your main screen. If you have several screens, c
 |---|---|
 | `RetroMonitor.cs` | The program source code |
 | `skin.png` | The monitor artwork |
+| `icon.ico` | The program and installer icon |
 | `build.bat` | Builds `RetroMonitor.exe` |
 | `Installer.cs` | Source code of the installer |
 | `build_installer.bat` | Builds `RetroResolutionFPS-Setup.exe` (the installer) |

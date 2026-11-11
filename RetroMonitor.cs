@@ -26,6 +26,227 @@ namespace RetroMonitor
     }
 
     // ------------------------------------------------------------------
+    //  CRT sound effects, synthesised in memory (no sound files needed)
+    // ------------------------------------------------------------------
+    static class CrtSound
+    {
+        const int Rate = 44100;
+        public static bool Enabled = true;
+        static System.Media.SoundPlayer onPlayer, offPlayer;
+
+        public static void PlayOn()
+        {
+            if (!Enabled) return;
+            try
+            {
+                Stop();
+                if (onPlayer == null) onPlayer = new System.Media.SoundPlayer(new MemoryStream(MakeOn()));
+                onPlayer.Play();
+            }
+            catch { }
+        }
+
+        public static void PlayOff()
+        {
+            if (!Enabled) return;
+            try
+            {
+                Stop();
+                if (offPlayer == null) offPlayer = new System.Media.SoundPlayer(new MemoryStream(MakeOff()));
+                offPlayer.Play();
+            }
+            catch { }
+        }
+
+        public static void Stop()
+        {
+            try
+            {
+                if (onPlayer != null) onPlayer.Stop();
+                if (offPlayer != null) offPlayer.Stop();
+            }
+            catch { }
+        }
+
+        // power-on: switch click, degauss thunk, rising flyback whine, static crackle
+        static byte[] MakeOn()
+        {
+            float[] b = new float[(int)(2.7 * Rate)];
+            Random r = new Random(7);
+            Click(b, 0.000, 0.55f, r);
+            Click(b, 0.045, 0.30f, r);
+            Degauss(b, 0.07, 0.8f);
+            Whine(b, 0.25, 2.5, 1800, 9000, 1.0, 0.075f, true);
+            Hum(b, 0.10, 2.5, 0.05f);
+            Static(b, 0.55, 1.5, 0.20f, r);
+            return ToWav(b);
+        }
+
+        // power-off: click, collapsing whine, then the final "pop" of the beam collapsing
+        static byte[] MakeOff()
+        {
+            float[] b = new float[(int)(0.95 * Rate)];
+            Random r = new Random(11);
+            Click(b, 0.000, 0.50f, r);
+            Static(b, 0.02, 0.50, 0.10f, r);
+            Whine(b, 0.02, 0.55, 9000, 250, 0.55, 0.16f, false);
+            Pop(b, 0.50, 0.65f, r);
+            Click(b, 0.56, 0.12f, r);
+            return ToWav(b);
+        }
+
+        // short mechanical click: noise burst plus a low knock
+        static void Click(float[] b, double at, float amp, Random r)
+        {
+            int i0 = (int)(at * Rate);
+            int n = (int)(0.06 * Rate);
+            float lp = 0;
+            for (int i = 0; i < n && i0 + i < b.Length; i++)
+            {
+                double t = (double)i / Rate;
+                float noise = (float)(r.NextDouble() * 2 - 1);
+                lp += 0.35f * (noise - lp);
+                float env = (float)Math.Exp(-t / 0.004);
+                float knock = (float)(Math.Sin(2 * Math.PI * 170 * t) * Math.Exp(-t / 0.012));
+                b[i0 + i] += amp * (0.8f * lp * env + 0.5f * knock);
+            }
+        }
+
+        // degauss "bwoong": deep thud whose pitch sags, with a buzzy edge
+        static void Degauss(float[] b, double at, float amp)
+        {
+            int i0 = (int)(at * Rate);
+            int n = (int)(0.75 * Rate);
+            double phase = 0;
+            for (int i = 0; i < n && i0 + i < b.Length; i++)
+            {
+                double t = (double)i / Rate;
+                double f = 48 + 70 * Math.Exp(-t / 0.12);
+                phase += 2 * Math.PI * f / Rate;
+                double env = Math.Exp(-t / 0.20) * Math.Min(1.0, t / 0.004);
+                double wob = 0.75 + 0.25 * Math.Sin(2 * Math.PI * 22 * t);
+                double v = Math.Sin(phase) + 0.45 * Math.Sin(phase * 2) + 0.2 * Math.Sin(phase * 3.01);
+                b[i0 + i] += (float)(amp * 0.6 * env * wob * v);
+            }
+        }
+
+        // mains hum
+        static void Hum(float[] b, double at, double end, float amp)
+        {
+            int i0 = (int)(at * Rate);
+            int n = (int)((end - at) * Rate);
+            for (int i = 0; i < n && i0 + i < b.Length; i++)
+            {
+                double t = (double)i / Rate;
+                double len = end - at;
+                double env = Math.Min(1.0, t / 0.4) * Math.Min(1.0, (len - t) / 0.4);
+                double v = Math.Sin(2 * Math.PI * 60 * t) + 0.5 * Math.Sin(2 * Math.PI * 120 * t);
+                b[i0 + i] += (float)(amp * env * v);
+            }
+        }
+
+        // flyback whine. rising: sweeps up to f1 over sweepSec then holds and fades; falling: sweeps down and fades.
+        static void Whine(float[] b, double at, double end, double f0, double f1, double sweepSec, float amp, bool rising)
+        {
+            int i0 = (int)(at * Rate);
+            int n = (int)((end - at) * Rate);
+            double phase = 0;
+            for (int i = 0; i < n && i0 + i < b.Length; i++)
+            {
+                double t = (double)i / Rate;
+                double len = end - at;
+                double u = Math.Min(1.0, t / sweepSec);
+                double f, env;
+                if (rising)
+                {
+                    f = f0 + (f1 - f0) * (1 - Math.Pow(1 - u, 2));
+                    env = Math.Min(1.0, t / 0.9) * Math.Pow(Math.Max(0.0, (len - t) / (len * 0.6)), 1.0);
+                    if (env > 1.0) env = 1.0;
+                }
+                else
+                {
+                    f = f1 + (f0 - f1) * Math.Pow(1 - u, 2.2);
+                    env = Math.Pow(Math.Max(0.0, 1 - t / len), 0.8) * Math.Min(1.0, t / 0.01);
+                }
+                phase += 2 * Math.PI * f / Rate;
+                b[i0 + i] += (float)(amp * env * (Math.Sin(phase) + 0.25 * Math.Sin(phase * 2)));
+            }
+        }
+
+        // crackling static that dies away
+        static void Static(float[] b, double at, double end, float amp, Random r)
+        {
+            int i0 = (int)(at * Rate);
+            int n = (int)((end - at) * Rate);
+            float lp = 0, gate = 1;
+            int hold = 0;
+            for (int i = 0; i < n && i0 + i < b.Length; i++)
+            {
+                double t = (double)i / Rate;
+                double len = end - at;
+                if (hold-- <= 0)
+                {
+                    gate = r.NextDouble() < 0.7 ? 1f : 0.15f;
+                    hold = (int)(Rate * (0.001 + r.NextDouble() * 0.004));
+                }
+                float noise = (float)(r.NextDouble() * 2 - 1);
+                lp += 0.6f * (noise - lp);
+                float hp = noise - lp * 0.5f;
+                double env = Math.Min(1.0, t / 0.05) * Math.Pow(Math.Max(0.0, 1 - t / len), 1.6);
+                b[i0 + i] += (float)(amp * env) * gate * hp;
+            }
+        }
+
+        // the "thwump" and zap when the picture collapses
+        static void Pop(float[] b, double at, float amp, Random r)
+        {
+            int i0 = (int)(at * Rate);
+            int n = (int)(0.4 * Rate);
+            double phase = 0;
+            for (int i = 0; i < n && i0 + i < b.Length; i++)
+            {
+                double t = (double)i / Rate;
+                phase += 2 * Math.PI * (60 + 90 * Math.Exp(-t / 0.03)) / Rate;
+                double thump = Math.Sin(phase) * Math.Exp(-t / 0.07);
+                double zap = (r.NextDouble() * 2 - 1) * Math.Exp(-t / 0.006);
+                b[i0 + i] += (float)(amp * (0.9 * thump + 0.6 * zap));
+            }
+        }
+
+        // float samples -> 16-bit mono WAV, normalised so it never clips
+        static byte[] ToWav(float[] b)
+        {
+            float peak = 0.001f;
+            foreach (float v in b) { float a = Math.Abs(v); if (a > peak) peak = a; }
+            float g = 0.8f / peak;
+            MemoryStream ms = new MemoryStream();
+            BinaryWriter w = new BinaryWriter(ms);
+            int dataLen = b.Length * 2;
+            w.Write(new char[] { 'R', 'I', 'F', 'F' });
+            w.Write(36 + dataLen);
+            w.Write(new char[] { 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ' });
+            w.Write(16);
+            w.Write((short)1);
+            w.Write((short)1);
+            w.Write(Rate);
+            w.Write(Rate * 2);
+            w.Write((short)2);
+            w.Write((short)16);
+            w.Write(new char[] { 'd', 'a', 't', 'a' });
+            w.Write(dataLen);
+            foreach (float v in b)
+            {
+                float x = v * g;
+                if (x > 1f) x = 1f;
+                if (x < -1f) x = -1f;
+                w.Write((short)(x * 32000));
+            }
+            w.Flush();
+            return ms.ToArray();
+        }
+    }
+
+    // ------------------------------------------------------------------
     //  Video probing (Windows property system first, ffprobe as fallback)
     // ------------------------------------------------------------------
     class VideoInfo
@@ -165,7 +386,10 @@ namespace RetroMonitor
 
         const double BootSec = 5.0;
         const double ShutSec = 0.85;
-        static readonly Rectangle SwitchRect = new Rectangle(296, 185, 34, 21);
+        // The rocker artwork is drawn in its original coordinates, then shifted to where the
+        // switch housing sits in skin.png (left side of the computer's lower bezel).
+        const int SwDX = -203, SwDY = 26;
+        static readonly Rectangle SwitchRect = new Rectangle(296 + SwDX, 185 + SwDY, 34, 21);
         bool pressed;
 
         Power pw = Power.Off;
@@ -187,7 +411,7 @@ namespace RetroMonitor
         [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr hObject);
 
         // Outline of the glass inside skin.png (pixel coordinates in the skin image)
-        static readonly Point[] ScreenPts = new Point[] { new Point(258, 71), new Point(260, 80), new Point(262, 92), new Point(262, 151), new Point(259, 174), new Point(256, 185), new Point(254, 188), new Point(224, 194), new Point(178, 196), new Point(143, 195), new Point(116, 192), new Point(102, 190), new Point(95, 185), new Point(92, 154), new Point(92, 91), new Point(93, 80), new Point(96, 72), new Point(105, 68), new Point(114, 67), new Point(244, 67), new Point(253, 68) };
+        static readonly PointF[] ScreenPts = new PointF[] { new PointF(289.7f, 184.3f), new PointF(287.5f, 186.7f), new PointF(284.6f, 188.7f), new PointF(281.2f, 190.2f), new PointF(277.4f, 191.2f), new PointF(269.1f, 192.2f), new PointF(247.3f, 193.8f), new PointF(207.6f, 195.4f), new PointF(171.4f, 195.3f), new PointF(127.1f, 193.9f), new PointF(94.8f, 191.8f), new PointF(86.7f, 190.2f), new PointF(83.4f, 188.7f), new PointF(80.5f, 186.7f), new PointF(78.2f, 184.3f), new PointF(75.5f, 178.3f), new PointF(74.5f, 175.0f), new PointF(72.5f, 158.4f), new PointF(71.0f, 133.5f), new PointF(70.7f, 109.7f), new PointF(72.3f, 76.1f), new PointF(74.5f, 56.1f), new PointF(75.3f, 52.8f), new PointF(77.8f, 46.7f), new PointF(80.0f, 44.1f), new PointF(82.8f, 42.1f), new PointF(86.2f, 40.6f), new PointF(90.0f, 39.5f), new PointF(126.4f, 36.3f), new PointF(150.6f, 35.0f), new PointF(171.1f, 34.4f), new PointF(207.9f, 34.8f), new PointF(227.6f, 35.4f), new PointF(244.8f, 36.4f), new PointF(277.9f, 39.6f), new PointF(281.7f, 40.6f), new PointF(285.1f, 42.2f), new PointF(288.0f, 44.1f), new PointF(290.1f, 46.7f), new PointF(292.6f, 52.9f), new PointF(294.1f, 63.1f), new PointF(296.4f, 91.7f), new PointF(297.0f, 118.6f), new PointF(295.8f, 151.9f), new PointF(293.3f, 174.9f), new PointF(292.4f, 178.2f) };
 
         State state = State.Idle;
         State prevState = State.Idle;
@@ -245,6 +469,7 @@ namespace RetroMonitor
             ShowInTaskbar = true;
             Text = "Retro Monitor";
             AllowDrop = true;
+            try { Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
             Rectangle wa = Screen.PrimaryScreen.WorkingArea;
             Location = new Point(wa.Right - skin.Width - 30, wa.Top + 50);
@@ -268,11 +493,16 @@ namespace RetroMonitor
             ToolStripMenuItem top = new ToolStripMenuItem("Always on top");
             top.CheckOnClick = true;
             top.CheckedChanged += delegate { TopMost = top.Checked; };
+            ToolStripMenuItem snd = new ToolStripMenuItem("Sound effects");
+            snd.CheckOnClick = true;
+            snd.Checked = true;
+            snd.CheckedChanged += delegate { CrtSound.Enabled = snd.Checked; if (!snd.Checked) CrtSound.Stop(); };
             ToolStripMenuItem clear = new ToolStripMenuItem("Clear screen");
             clear.Click += delegate { scanId++; state = State.Idle; Render(); };
             ToolStripMenuItem exit = new ToolStripMenuItem("Power off (exit)");
             exit.Click += delegate { Close(); };
             menu.Items.Add(top);
+            menu.Items.Add(snd);
             menu.Items.Add(clear);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(exit);
@@ -440,6 +670,9 @@ namespace RetroMonitor
 
         void DrawScreen(Graphics g)
         {
+            // powered off: the glass from skin.png shows through untouched
+            if (pw == Power.Off) return;
+
             PointF c = new PointF(sb.X + sb.Width / 2, sb.Y + sb.Height / 2);
 
             // faint light spill onto the bezel
@@ -533,10 +766,29 @@ namespace RetroMonitor
                     Color.FromArgb(30, 255, 255, 255), Color.FromArgb(0, 255, 255, 255), 45f))
                     g.FillPath(shb, sheen);
             }
+            // switching off: fade the original glass back in as the dot dies
+            float reveal = 0f;
+            if (pw == Power.ShuttingDown)
+            {
+                double rt = (clock.ElapsedMilliseconds - pwMs) / 1000.0;
+                reveal = (float)Math.Max(0.0, Math.Min(1.0, (rt - 0.55) / (ShutSec - 0.55)));
+                if (reveal > 0f)
+                    using (ImageAttributes ra = new ImageAttributes())
+                    {
+                        ColorMatrix rm = new ColorMatrix();
+                        rm.Matrix33 = reveal;
+                        ra.SetColorMatrix(rm);
+                        g.InterpolationMode = InterpolationMode.NearestNeighbor;
+                        g.PixelOffsetMode = PixelOffsetMode.Half;
+                        g.DrawImage(skin, new Rectangle(0, 0, skin.Width, skin.Height),
+                            0, 0, skin.Width, skin.Height, GraphicsUnit.Pixel, ra);
+                        g.PixelOffsetMode = PixelOffsetMode.Default;
+                    }
+            }
             g.Restore(gs);
 
             // clean dark lip around the glass
-            using (Pen rim = new Pen(Color.FromArgb(235, 5, 9, 7), 2.4f))
+            using (Pen rim = new Pen(Color.FromArgb((int)(235 * (1f - reveal)), 5, 9, 7), 2.4f))
             {
                 rim.LineJoin = LineJoin.Round;
                 g.DrawPath(rim, screenPath);
@@ -556,10 +808,12 @@ namespace RetroMonitor
             {
                 pw = Power.Booting;
                 state = State.Idle;
+                CrtSound.PlayOn();
             }
             else
             {
                 pw = Power.ShuttingDown;
+                CrtSound.PlayOff();
             }
             pwMs = clock.ElapsedMilliseconds;
             Render();
@@ -681,7 +935,7 @@ namespace RetroMonitor
             GraphicsState st = g.Save();
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            g.DrawImage(swBmp, new RectangleF(284f, 174f, 58f, 46f), new RectangleF(0f, 0f, 232f, 184f), GraphicsUnit.Pixel);
+            g.DrawImage(swBmp, new RectangleF(284f + SwDX, 174f + SwDY, 58f, 46f), new RectangleF(0f, 0f, 232f, 184f), GraphicsUnit.Pixel);
             g.Restore(st);
         }
 
@@ -692,7 +946,7 @@ namespace RetroMonitor
             float x0 = btn.X, x1 = btn.Right, y0 = btn.Y, y1 = btn.Bottom;
             float midX = (x0 + x1) / 2f, midY = (y0 + y1) / 2f;
 
-            // amber light spilling over the black housing (kept inside its border)
+            // red light spilling over the black housing (kept inside its border)
             GraphicsState g0 = g.Save();
             using (GraphicsPath hc = RoundRect(new RectangleF(297.4f, 187.7f, 31.2f, 16.5f), 1.6f))
                 g.SetClip(hc, CombineMode.Replace);
@@ -704,7 +958,7 @@ namespace RetroMonitor
                     float e = 0.6f + i * 1.55f;
                     RectangleF gr = new RectangleF(btn.X - e, btn.Y - e, btn.Width + 2 * e, btn.Height + 2 * e);
                     using (GraphicsPath gp = RoundRect(gr, 2f + e))
-                    using (Brush gb = new SolidBrush(Color.FromArgb((int)(9 * pulse * s), 255, 150, 30)))
+                    using (Brush gb = new SolidBrush(Color.FromArgb((int)(9 * pulse * s), 255, 45, 35)))
                         g.FillPath(gb, gp);
                 }
             }
@@ -723,10 +977,10 @@ namespace RetroMonitor
             RectangleF planeA = new RectangleF(x0 + stripL, y0, ridge - (x0 + stripL), btn.Height);
             RectangleF planeB = new RectangleF(ridge, y0, (x1 - stripR) - ridge, btn.Height);
 
-            Color onRaisedT = Color.FromArgb(238, 255, 232, 160), onRaisedB = Color.FromArgb(238, 255, 182, 56);
-            Color onSunkT = Color.FromArgb(238, 232, 146, 30), onSunkB = Color.FromArgb(238, 176, 92, 8);
-            Color offRaisedT = Color.FromArgb(226, 228, 160, 60), offRaisedB = Color.FromArgb(226, 184, 110, 28);
-            Color offSunkT = Color.FromArgb(226, 160, 92, 24), offSunkB = Color.FromArgb(226, 112, 58, 10);
+            Color onRaisedT = Color.FromArgb(218, 255, 150, 140), onRaisedB = Color.FromArgb(218, 238, 36, 30);
+            Color onSunkT = Color.FromArgb(218, 214, 30, 26), onSunkB = Color.FromArgb(218, 140, 10, 10);
+            Color offRaisedT = Color.FromArgb(206, 170, 44, 40), offRaisedB = Color.FromArgb(206, 120, 18, 16);
+            Color offSunkT = Color.FromArgb(206, 104, 22, 20), offSunkB = Color.FromArgb(206, 66, 10, 10);
 
             // side walls (the thickness of the raised end)
             for (int w = 0; w < 2; w++)
@@ -734,13 +988,13 @@ namespace RetroMonitor
                 float wl = w == 0 ? stripL : stripR;
                 if (wl < 0.15f) continue;
                 RectangleF wr = w == 0 ? new RectangleF(x0, y0, wl, btn.Height) : new RectangleF(x1 - wl, y0, wl, btn.Height);
-                Color outer = Lerp(Color.FromArgb(226, 176, 100, 20), Color.FromArgb(238, 214, 120, 24), s);
-                Color inner = Lerp(Color.FromArgb(226, 240, 176, 84), Color.FromArgb(238, 255, 206, 110), s);
+                Color outer = Lerp(Color.FromArgb(206, 150, 30, 26), Color.FromArgb(218, 206, 36, 30), s);
+                Color inner = Lerp(Color.FromArgb(206, 238, 110, 100), Color.FromArgb(218, 255, 160, 150), s);
                 using (LinearGradientBrush wb = new LinearGradientBrush(new RectangleF(wr.X - 0.01f, wr.Y, wr.Width + 0.02f, wr.Height),
                     w == 0 ? outer : inner, w == 0 ? inner : outer, 0f))
                     g.FillRectangle(wb, wr);
                 float lx = w == 0 ? wr.Right : wr.X;
-                using (Pen lp = new Pen(Color.FromArgb((int)(120 + 70 * s), 255, 228, 170), 0.5f))
+                using (Pen lp = new Pen(Color.FromArgb((int)(120 + 70 * s), 255, 190, 180), 0.5f))
                     g.DrawLine(lp, lx, y0, lx, y1);
             }
 
@@ -752,13 +1006,13 @@ namespace RetroMonitor
                 float ra = raised[i];
                 Color cT = Lerp(Lerp(offSunkT, offRaisedT, ra), Lerp(onSunkT, onRaisedT, ra), s);
                 Color cB = Lerp(Lerp(offSunkB, offRaisedB, ra), Lerp(onSunkB, onRaisedB, ra), s);
-                if (pressed) { cT = Lerp(cT, Color.FromArgb(cT.A, 60, 30, 0), 0.3f); cB = Lerp(cB, Color.FromArgb(cB.A, 40, 18, 0), 0.3f); }
+                if (pressed) { cT = Lerp(cT, Color.FromArgb(cT.A, 50, 6, 4), 0.3f); cB = Lerp(cB, Color.FromArgb(cB.A, 34, 4, 2), 0.3f); }
                 RectangleF pr = planes[i];
                 using (LinearGradientBrush lb = new LinearGradientBrush(new RectangleF(pr.X, pr.Y - 0.01f, pr.Width, pr.Height + 0.02f), cT, cB, 90f))
                     g.FillRectangle(lb, pr);
                 // soft horizontal shading across each plane, like the reference
-                Color sh0 = i == 0 ? Color.FromArgb(0, 60, 20, 0) : Color.FromArgb(46, 60, 20, 0);
-                Color sh1 = i == 0 ? Color.FromArgb(46, 60, 20, 0) : Color.FromArgb(0, 60, 20, 0);
+                Color sh0 = i == 0 ? Color.FromArgb(0, 50, 0, 0) : Color.FromArgb(46, 50, 0, 0);
+                Color sh1 = i == 0 ? Color.FromArgb(46, 50, 0, 0) : Color.FromArgb(0, 50, 0, 0);
                 using (LinearGradientBrush hs = new LinearGradientBrush(new RectangleF(pr.X - 0.01f, pr.Y, pr.Width + 0.02f, pr.Height), sh0, sh1, 0f))
                     g.FillRectangle(hs, pr);
             }
@@ -772,8 +1026,8 @@ namespace RetroMonitor
                     bp.AddEllipse(bl);
                     using (PathGradientBrush pg = new PathGradientBrush(bp))
                     {
-                        pg.CenterColor = Color.FromArgb((int)(120 * s * rl), 255, 248, 200);
-                        pg.SurroundColors = new Color[] { Color.FromArgb(0, 255, 200, 90) };
+                        pg.CenterColor = Color.FromArgb((int)(120 * s * rl), 255, 210, 200);
+                        pg.SurroundColors = new Color[] { Color.FromArgb(0, 255, 90, 70) };
                         g.FillPath(pg, bp);
                     }
                 }
@@ -783,8 +1037,8 @@ namespace RetroMonitor
                     bp2.AddEllipse(bl2);
                     using (PathGradientBrush pg2 = new PathGradientBrush(bp2))
                     {
-                        pg2.CenterColor = Color.FromArgb((int)(70 * s + 50 * rr * (1f - s)), 255, 190, 70);
-                        pg2.SurroundColors = new Color[] { Color.FromArgb(0, 255, 160, 40) };
+                        pg2.CenterColor = Color.FromArgb((int)(70 * s + 50 * rr * (1f - s)), 255, 70, 56);
+                        pg2.SurroundColors = new Color[] { Color.FromArgb(0, 255, 50, 36) };
                         g.FillPath(pg2, bp2);
                     }
                 }
@@ -796,7 +1050,7 @@ namespace RetroMonitor
                 g.FillRectangle(stb, shT);
 
             // fine moulded texture, very subtle
-            using (Brush tl = new SolidBrush(Color.FromArgb((int)(22 + 10 * s), 255, 244, 200)))
+            using (Brush tl = new SolidBrush(Color.FromArgb((int)(22 + 10 * s), 255, 215, 205)))
                 for (float ty = y0 + 0.7f; ty < y1; ty += 1.45f)
                     for (float tx2 = x0 + 0.7f; tx2 < x1; tx2 += 1.45f)
                         g.FillEllipse(tl, tx2, ty, 0.8f, 0.8f);
@@ -807,7 +1061,7 @@ namespace RetroMonitor
                 new PointF(rp.X + 0.8f, y0 + 0.3f), new PointF(rp.X + rp.Width * 0.7f, y0 + 0.3f),
                 new PointF(rp.X + rp.Width * 0.35f, y0 + 3.8f), new PointF(rp.X + 0.8f, y0 + 3.8f) };
             using (LinearGradientBrush gl = new LinearGradientBrush(new RectangleF(rp.X, y0, rp.Width, 4.0f),
-                Color.FromArgb((int)(50 + 40 * s), 255, 255, 235), Color.FromArgb(0, 255, 255, 235), 90f))
+                Color.FromArgb((int)(50 + 40 * s), 255, 240, 235), Color.FromArgb(0, 255, 240, 235), 90f))
                 g.FillPolygon(gl, streak);
 
             // O and dash markings, printed on the lens and lit from behind
@@ -816,7 +1070,7 @@ namespace RetroMonitor
             float sxB = Math.Max(0.6f, Math.Min(1.1f, planeB.Width / 9.6f));
             int symA_a = (int)(200 + 40 * s), symB_a = (int)(200 + 40 * s);
             float ringR = 2.2f;
-            using (Pen glowP = new Pen(Color.FromArgb((int)(34 * s), 255, 240, 190), 1.9f))
+            using (Pen glowP = new Pen(Color.FromArgb((int)(34 * s), 255, 215, 205), 1.9f))
             {
                 g.DrawEllipse(glowP, symA - ringR * sxA, midY - ringR, 2 * ringR * sxA, 2 * ringR);
                 g.DrawLine(glowP, symB - 2.3f * sxB, midY, symB + 2.3f * sxB, midY);
@@ -827,13 +1081,13 @@ namespace RetroMonitor
                 g.DrawLine(symD, symB - 2.3f * sxB, midY, symB + 2.3f * sxB, midY);
 
             // ridge and outlines
-            using (Pen rd = new Pen(Color.FromArgb(150, 110, 56, 4), 0.5f))
+            using (Pen rd = new Pen(Color.FromArgb(150, 96, 8, 6), 0.5f))
                 g.DrawLine(rd, ridge, y0, ridge, y1);
-            using (Pen rl2 = new Pen(Color.FromArgb((int)(60 + 60 * s), 255, 225, 150), 0.4f))
+            using (Pen rl2 = new Pen(Color.FromArgb((int)(60 + 60 * s), 255, 190, 180), 0.4f))
                 g.DrawLine(rl2, ridge + (rl > 0.5f ? -0.45f : 0.45f), y0, ridge + (rl > 0.5f ? -0.45f : 0.45f), y1);
-            using (Pen hl = new Pen(Color.FromArgb((int)(100 + 70 * s), 255, 246, 210), 0.5f))
+            using (Pen hl = new Pen(Color.FromArgb((int)(100 + 70 * s), 255, 225, 215), 0.5f))
                 g.DrawLine(hl, x0 + 0.4f, y0 + 0.25f, x1 - 0.4f, y0 + 0.25f);
-            using (Pen edge = new Pen(Color.FromArgb(150, 80, 40, 2), 0.5f))
+            using (Pen edge = new Pen(Color.FromArgb(150, 70, 6, 4), 0.5f))
                 g.DrawRectangle(edge, x0, y0, btn.Width, btn.Height);
         }
 
