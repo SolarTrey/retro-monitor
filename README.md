@@ -2,7 +2,11 @@
 
 A small desktop widget for Windows that looks like a vintage CRT monitor. Drag a video file onto its screen and it tells you the video's **frame rate (FPS)** and **resolution**, in glowing green text.
 
+![Boot screen of Retro Resolution & FPS](images/boot.png)
+
 The monitor has no window frame or background. It sits on your desktop as a small, see-through widget, so your icons and wallpaper stay visible around it.
+
+> The pictures in this README are mock-ups made while designing the program. Replace them with screenshots of your own build (`images/boot.png`, `images/switch.png`) if you want them to match exactly.
 
 ## Features
 
@@ -34,6 +38,8 @@ If Windows SmartScreen warns about `build.bat` or the exe, click **More info**, 
 When you open the program, the monitor is switched **off** and the screen is black.
 
 Click the amber rocker switch in the right-hand panel, labelled **POWER**. The switch tilts across and the monitor starts up:
+
+![The amber rocker switch: off, and the two on positions](images/switch.png)
 
 1. The screen flashes on and a burst of static fades out.
 2. The title **RETRO RESOLUTION & FPS** types out.
@@ -112,6 +118,7 @@ It starts near the top right of your main screen. If you have several screens, c
 | `skin.png` | The monitor artwork |
 | `build.bat` | Builds `RetroMonitor.exe` |
 | `LICENSE` | Licence terms |
+| `images/` | Pictures used in this README |
 
 ## Licence
 
