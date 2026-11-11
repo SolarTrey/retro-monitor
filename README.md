@@ -8,8 +8,6 @@ A small desktop widget for Windows that looks like a vintage CRT monitor. Drag a
 
 The computer has no window frame or background. It sits on your desktop as a small, see-through widget, so your icons and wallpaper stay visible around it.
 
-> The pictures in this README are mock-ups made while designing the program, so the real thing may differ slightly.
-
 ## Features
 
 - Retro beige computer with a CRT screen and a transparent background
